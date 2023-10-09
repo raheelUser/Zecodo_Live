@@ -1,0 +1,38 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class AddFeaturedToServicesTable extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        Schema::table('services', function (Blueprint $table) {
+            $table->boolean('featured')->default(false);
+            $table->timestamp('featured_until')->nullable();
+            $table->boolean('hired')->default(false);
+            $table->timestamp('hired_until')->nullable();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::table('services', function (Blueprint $table) {
+            $table->dropColumn('featured');
+            $table->dropColumn('featured_until');
+            $table->dropColumn('hired');
+            $table->dropColumn('hired_until');
+        });
+    }
+}
