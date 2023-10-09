@@ -1,0 +1,47 @@
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Getting-Started.gitlab-ci.yml
+stages:          # List of stages for jobs, and their order of execution
+  - deploy
+
+deploy-production:
+  stage: deploy
+  when: manual
+  only:
+  - master
+  script:
+    - echo "Deploy to production server, will not trigger automatically-inactive at the moment"
+  environment: production
+
+deploy-staging:
+  stage: deploy  
+  environment: staging
+  image: docker:dind
+  services:
+  - docker:dind
+  only:
+  - master
+  before_script:
+    - echo "\n ======= Initilizaling The Zecodo Backend Staging Deploy JOB =========== \n"
+    - apk add --update
+    - apk add --no-cache openssh
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan -t rsa $EC2_SERVER_IP >> ~/.ssh/known_hosts
+
+  script:
+    - echo "\n========== Copying Source code to AWS EC2 Server - Backend code will be build on ec2 to run migrations on db ===========\n"
+    - ssh -t -t ubuntu@$EC2_SERVER_IP "cd /tmp && git clone -b devops git@gitlab.com:mnnasib7777/ecomm_back.git"
+    - scp -r ${STAGING_ENV_FILE} ubuntu@$EC2_SERVER_IP:/tmp/ecomm_back/.env
+    - echo "\n======== Building Docker Image =========\n"
+    - ssh -t -t ubuntu@$EC2_SERVER_IP "cd /tmp/ecomm_back/ && docker build -t registry.gitlab.com/mnnasib7777/ecomm_back ."
+    - wait
+    - echo "\n======= Pushing Docker Image to Gitlab Container Registry ==========\n"
+    - ssh -t -t ubuntu@$EC2_SERVER_IP "docker push registry.gitlab.com/mnnasib7777/ecomm_back"
+    - wait
+    - echo "\n======== Deploying backend build to staging server ========\n"
+    - ssh -t -t ubuntu@$EC2_SERVER_IP "docker stack deploy -c /tmp/ecomm_back/docker-compose.yaml staging-ecom_backend --with-registry-auth"
+    - echo "\n=========== Cleaning the Workspace ===========\n"
+    - ssh -t -t ubuntu@$EC2_SERVER_IP "rm -rf /tmp/ecomm_back && docker system prune -f"
+
